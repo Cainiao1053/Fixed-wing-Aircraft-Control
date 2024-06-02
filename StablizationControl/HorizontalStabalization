@@ -1,0 +1,38 @@
+pi = math.pi;
+r0 = 0; --set a value to record roll value of the previous iteration
+while true do
+
+li = redstone.getAnalogInput("front") --left input from user controller
+ri = redstone.getAnalogInput("back") --right input
+output = -li+ri; --calculate for net output
+Q = ship.getQuaternion(); --ship Quaternion
+w = Q.w;
+x = Q.z;
+y = Q.x;
+z = Q.y;
+r = math.atan2(2*(w*x+y*z),(1-2*(x^2+y^2))); --roll, ship should be assembled to the south
+p = math.asin(2*(w*y-x*z)); --pitch
+y = math.atan2(2*(w*z+x*y),(1-2*(y^2+z^2))); --yaw
+p = p*180/pi;
+y = y*180/pi;
+r = r*180/pi;
+omg = (r-r0)/0.12; --angular velocity
+r0 = r; --update r0
+if redstone.getInput("top") == true then
+    fix = 0.5*r+(r^2*omg/110000); --algorithm for stablization, output the redstone target analog
+    output = output - fix; -- assistive control
+end
+if output<-15 then --redstone analog bound
+output = -15;
+elseif output>15 then
+output =15;
+end
+redstone.setAnalogOutput("left", 0); --clear outputs
+redstone.setAnalogOutput("right", 0);
+if output<0 then --set outputs
+    redstone.setAnalogOutput("left", math.abs(output));
+elseif output>0 then
+    redstone.setAnalogOutput("right", output);
+end
+sleep(0.1);
+end
