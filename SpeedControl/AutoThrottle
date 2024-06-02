@@ -1,0 +1,46 @@
+mod = peripheral.find("modem"); --modem output setting, optional
+mod.open(220);
+rednet.open("front"); --modem portal
+s = peripheral.find("electric_motor");
+thr = -100; --throttle output
+vtgt = 84; --Target Speed
+vlbnd = 70; --Speed lower bound
+vubnd = 85; --Speed upper bound
+v0 = 0; --speed of the last iteration
+brk = 0;
+while true do
+spd = ship.getVelocity();
+v = math.sqrt(spd.x^2+spd.y^2+spd.z^2);
+v = v*3.6;--ship speed
+a = (v-v0)/0.35; --acceleration
+v0 = v;
+if redstone.getInput("left") == true then --manual throttle increasement
+thr = thr - 4;
+elseif redstone.getInput("right") == true then --manual throttle decreasement
+thr = thr + 4;
+else
+end
+if redstone.getInput("top") == true then --auto mod switch
+dthr = -(1.5*(v-vtgt)+(v-vtgt)*a/15);  --PID
+brk = 2*(v-vtgt);  --brake analog
+thr = thr - dthr;
+end
+if brk<0 then --set bound for brake
+    brk = 0;
+elseif brk>15 then
+    brk = 15;
+end
+redstone.setAnalogOutput("bottom", brk);
+if thr<-256 then --bound limit
+thr = -256;
+elseif thr>-32 then
+thr = -32;
+end
+thr, rnd = math.modf(thr);
+s.setSpeed(thr);
+v = string.format("%.2f",v);
+thrb = math.abs(thr); --broadcast throttle
+str = {thrb,v};
+rednet.broadcast(str);
+sleep(0.3);
+end
