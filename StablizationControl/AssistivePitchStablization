@@ -1,0 +1,38 @@
+pi = math.pi;
+p0 = 0; -- set pitch from previous iteration
+while true do
+li = redstone.getAnalogInput("front") --left input from controller
+di = redstone.getAnalogInput("back") --right input
+output = -li+di; --net user output
+Q = ship.getQuaternion(); --quaternion of ship
+w = Q.w;
+x = Q.z;
+y = Q.x;
+z = Q.y;
+r = math.atan2(2*(w*x+y*z),(1-2*(x^2+y^2))); --roll
+p = math.asin(2*(w*y-x*z)); --pitch
+y = math.atan2(2*(w*z+x*y),(1-2*(y^2+z^2))); --yaw
+p = p*180/pi;
+y = y*180/pi;
+r = r*180/pi;
+pomg = (p-p0)/0.12; -- angular velocity
+p0 = p; --update
+if redstone.getInput("top") == true then --switch
+    
+    fix = (0.5*p+(p^2*pomg/110000))*((90-math.abs(r))/90); --algorithm
+    output = output - fix; -- fix output
+end
+if output<-15 then --output bound
+output = -15;
+elseif output>15 then
+output =15;
+end
+redstone.setAnalogOutput("left", 0); --clear output from previous
+redstone.setAnalogOutput("right", 0);
+if output<0 then --set output
+    redstone.setAnalogOutput("left", math.abs(output));
+elseif output>0 then
+    redstone.setAnalogOutput("right", output);
+end
+sleep(0.1);
+end
