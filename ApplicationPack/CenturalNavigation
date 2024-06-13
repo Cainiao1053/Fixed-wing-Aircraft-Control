@@ -1,1 +1,234 @@
+mod = peripheral.find("modem");
+mod.open(224);
+rednet.open("back"); --modem portal
+mon1 = peripheral.wrap("left");
+v0 = 0; --speed of the last iteration
+MODE = 0; --set flight sections of taking off, pin-flying and landing
+htgt = 0;
+yaw0 = 0;
+pitch0 = 0;
+roll0 = 0;
+axs = 0;
+axstgt = 0;
+pi = math.pi;
+LANDED = 0;
+vhor = 0;
+xdpt = 2991; --departure coord
+zdpt = -571;
+xdst = 1180; --destination coord
+zdst = 1122;
+ydst = -61;
+cruiseheight = 60;
+landextensn = 1000;
+pitchmax = 7;
+directiondpt = "W";
+directiondst = "N";
+while DPTAPT == nil do
+    write("Please type in the departure airport")
+    DPTAPT = read();
+    if DPTAPT == "AP1N" then
+        xdpt = 1180;
+        zdpt = 1122;
+        directiondpt = "N";
+    elseif DPTAPT == "AP1S" then
+        xdpt = 1180;
+        zdpt = 1122;
+        directiondpt = "S";
+    elseif DPTAPT == "AP2E" then
+        xdpt = 2923;
+        zdpt = -574;
+        directiondpt = "E";
+    elseif DPTAPT == "AP2W" then
+        xdpt = 2923;
+        zdpt = -574;
+        directiondpt = "W";
+    else
+        print("Airport not found");
+        DPTAPT = nil;
+    end
+    sleep(1);
+end
+while DSTAPT == nil do
+    write("Please type in the destination airport")
+    DSTAPT = read();
+    if DSTAPT == DPTAPT then
+        write("You can not select the same airport as destination!")
+        DSTAPT = nil;
+    elseif DSTAPT == "AP1N" then
+        xdst = 1180;
+        zdst = 1122;
+        ydst = -61;
+        directiondst = "N";
+    elseif DSTAPT == "AP1S" then
+        xdst = 1180;
+        zdst = 1122;
+        ydst = -61;
+        directiondst = "S";
+    elseif DSTAPT == "AP2E" then
+        xdst = 2923;
+        zdst = -574;
+        ydst = -61;
+        directiondst = "E";
+    elseif DSTAPT == "AP2W" then
+        xdst = 2923;
+        zdst = -574;
+        ydst = -61;
+        directiondst = "W";
+    else
+        print("Airport not found");
+        DSTAPT = nil;
+    end
+    sleep(1);
+end
+write("Excuting navigation initialization");
+if directiondpt =="S" then -- set the initial values for taking off and reach the first interval
+    x01 = xdpt;
+    z01 = zdpt + 100;
+    y01 = cruiseheight;
+    yawtgt01 = 0;
+elseif directiondpt =="N" then
+    x01 = xdpt;
+    z01 = zdpt - 100;
+    y01 = cruiseheight;
+    yawtgt01 = 180;
+elseif directiondpt =="E" then
+    x01 = xdpt + 100;
+    z01 = zdpt;
+    y01 = cruiseheight;
+    yawtgt01 = 90;
+elseif directiondpt =="W" then
+    x01 = xdpt - 100;
+    z01 = zdpt;
+    y01 = cruiseheight;
+    yawtgt01 = -90;
+end
+if directiondst == "S" then --arrive FROM what direction
+    x03 = xdst;
+    z03 = zdst + landextensn;
+    y03 = ydst -4;
+    yawtgt03 = -180;
+elseif directiondst == "N" then --arrive FROM what direction
+    x03 = xdst;
+    z03 = zdst - landextensn;
+    y03 = ydst -14;
+    yawtgt03 = 0;
+elseif directiondst == "E" then --arrive FROM what direction
+    x03 = xdst + landextensn;
+    z03 = zdst;
+    y03 = ydst -14;
+    yawtgt03 = -90
+elseif directiondst == "W" then --arrive FROM what direction
+    x03 = xdst -landextensn;
+    z03 = zdst;
+    y03 = ydst -14;
+    yawtgt03 = 90;
+end
+yawtgt = yawtgt01; --set initial target directions and coords
+xtgt = x01;
+htgt = y01;
+ztgt = z01;
+sleep(0.5);
+write("Initialization Success, navigation Start");
 
+while true do
+spd = ship.getVelocity();
+vx = spd.x; --m/s
+vy = spd.y;
+vz = spd.z;
+v = math.sqrt(spd.x^2+spd.y^2+spd.z^2);
+v = v*3.6;--ship speed in km/h
+a = (v-v0)/0.35; --acceleration
+v0 = v;
+pos = ship.getWorldspacePosition();
+posx = pos.x;
+posz = pos.z;
+h = pos.y;
+Q = ship.getQuaternion();
+w = Q.w;
+x = Q.z;
+y = Q.x;
+z = Q.y;
+roll = math.atan2(2*(w*x+y*z),(1-2*(x^2+y^2)));
+pitch = math.asin(2*(w*y-x*z));
+yaw = math.atan2(2*(w*z+x*y),(1-2*(y^2+z^2)));
+pitch = pitch*180/pi;
+yaw = yaw*180/pi;
+roll = roll*180/pi;
+omgr = (roll-roll0)/0.12;
+omgy = (yaw-yaw0)/0.12;
+omgp = (pitch-pitch0)/0.12;
+roll0 = roll;
+yaw0 = yaw;
+pitch0 = pitch;
+if (math.abs(posx-xdpt)+math.abs(posz-zdpt))>300 and MODE ~=2 then
+    MODE = 1;
+end
+if (math.abs(posx-x03)+math.abs(posz-z03))<150 then
+    MODE = 2;
+end
+if MODE == 1 then
+    yawtgt = math.atan2((x03-posx),(z03-posz))*180/pi; --pin to the next point
+elseif MODE == 2 then -- Landing mode
+    htgt = y03;
+    if directiondst == "S" then
+        xtgt = xdst;
+        ztgt = posz - 100;
+        htgt = (cruiseheight - ydst)*(posz - ztgt)/landextensn + y03;
+    elseif directiondst == "E" then
+        ztgt = zdst;
+        xtgt = posx - 100;
+        htgt = (cruiseheight - ydst)*(posx - xtgt)/landextensn + y03;
+    elseif directiondst == "W" then
+        ztgt = zdst;
+        xtgt = posx + 100;
+        htgt = (cruiseheight - ydst)*(xtgt - posx)/landextensn + y03;
+    elseif directiondst == "N" then
+        xtgt = xdst;
+        ztgt = posz + 100;
+        htgt = (cruiseheight - ydst)*(ztgt - posz)/landextensn + y03;
+    end
+    yawtgt = math.atan2((xtgt-posx),(ztgt-posz))*180/pi; --pin to the next point
+end
+ydiff = yawtgt - yaw; --Yaw difference set ccw positive
+if ydiff>180 then
+    ydiff = 360 - ydiff;
+elseif ydiff<-180 then
+    ydiff = ydiff + 360;
+end
+    rdiff = -(ydiff/2 + omgy*ydiff^2/1800); --difference of roll
+if rdiff>25 then
+    rdiff = 25;
+elseif rdiff<-25 then
+    rdiff = -25;
+end
+pdiff = (h-htgt)/4+vy*(h-htgt)^2/8000; --pitch changes
+if pdiff>10 then
+    pdiff = 10;
+elseif pdiff<-10 then
+    pdiff = -10;
+end
+if (math.abs(posx - xdst) + math.abs(posz - zdst))<10 then
+    LANDED = 1;
+end
+mon1.clear();
+vsent = string.format("%.1f",v);
+psent = string.format("%.1f",pitch);
+rsent = string.format("%.1f",roll);
+ysent = string.format("%.1f",yaw);
+mon1.setCursorPos(1,1);
+mon1.write("V:");
+mon1.write(vsent);
+mon1.setCursorPos(1,2);
+mon1.write("P:");
+mon1.write(psent);
+mon1.setCursorPos(1,3);
+mon1.write("R:");
+mon1.write(rsent);
+mon1.setCursorPos(1,4);
+mon1.write("Y:");
+mon1.write(ysent);
+str = {rdiff,pdiff,LANDED};
+rednet.send(22,str);
+rednet.send(23,str);
+sleep(0.1);
+end
